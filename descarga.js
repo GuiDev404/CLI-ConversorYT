@@ -1,149 +1,148 @@
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
-const { promisify } = require('util');
-const exec = promisify(require('child_process').exec);
+const fs = require("fs");
+const { promisify } = require("util");
+const exec = promisify(require("child_process").exec);
+const cliProgress = require('cli-progress');
 
-const inquirer = require('inquirer');
-const youtubedl = require('youtube-dl');
-const chalk = require('chalk');
-const figlet = require('figlet');
+const inquirer = require("inquirer");
+const youtubedl = require("ytdl-core");
+const chalk = require("chalk");
+const separator =  new inquirer.Separator();
+const downloadProgress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
-const mensajePorDefecto = (infoVideo) =>{
-    console.log(chalk.hex('#ecf0f1')(`\nTITULO DEL VIDEO: ${chalk.white.bgBlue(infoVideo.titulo)}.`))
-    console.log(chalk.hex('#ecf0f1')(`ARCHIVO: ${chalk.white.bgBlue(infoVideo.nombreArchivo)}.`))
-    console.log(chalk.hex('#ecf0f1')(`SUBIDO POR: ${chalk.white.bgBlue(infoVideo.subidoPor)}.\n`))
-    console.log(chalk.hex('#f1c40f').bgBlack('Descarga finalizada.\n'))
+const { log, showVideoInfo, abortConversion, filterData } = require('./utils');
+const { GRAY, GRAY_DARK, RED, PATH_DOWNLOAD, MAIN_TITLE, OK } = require('./utils/const');
+
+async function getInfo(URL) {
+  const info = await youtubedl.getInfo(URL);
+  const { title, lengthSeconds: duration, description, ownerChannelName, thumbnails } = info.videoDetails;
+
+  const videosWithAudio = youtubedl.filterFormats(info.formats, 'audioandvideo');
+  const videosLsData = filterData(videosWithAudio);
+
+  const onlyAudio = youtubedl.filterFormats(info.formats, 'audioonly');
+  const audioLsData = filterData(onlyAudio);
+
+  return { 
+    title, duration, description, ownerChannelName, thumbnails,
+    videosLsData,
+    audioLsData,
+  }
 }
 
-const abortConversion = (msg = 'OH NO, lo sentimos, algo salio mal.') => {
-    process.once('exit', _ => console.log( chalk.hex('#e17055')(msg) ));
-    process.exit(0);
+function saveFile ({ url, title, ext, itag }) {
+  const outputFile = fs.createWriteStream(PATH_DOWNLOAD(`${title}${ext}`))
+  
+  const video = youtubedl(url, { filter: (format) => format.itag == itag });
+  video.pipe(outputFile)
+  
+  log({ COLOR: OK, TEXT: "Descargando: \n" })
+  downloadProgress.start(100, 0);
+
+  video.on('progress', (chunkLength, downloaded, total) => {
+    // const percent = downloaded / total;
+    const progress = Number(((downloaded * 100) / total).toFixed(2));
+    downloadProgress.update(progress, 0);
+  })
+
+  video.once('finish', async ()=> {
+    downloadProgress.stop();
+    await abrirAlTerminar();
+
+    log({ COLOR: OK, TEXT: "\nGracias por usar CLI-Conversor. Adios!" })
+  })
 }
 
-const validacionDeURL = (url) =>{
-    let esValido = /^(http[s]?:\/\/)?(w{3}.)?youtu(be|\.be)?(\.com)?\/.+/gm.test(url);  // global y multilinea (/regex/gm)
+const abrirAlTerminar = async () => {
+  const response = await inquirer.prompt({
+    type: "confirm",
+    name: "Abrir descargas: ",
+    message: log({ COLOR: GRAY, TEXT: "¿Quiere abrir la carpeta de descargas?" }),
+  });
 
-    (!esValido) ? abortConversion('URL ingresada no valida. Ingrese una valida.') : true;
-}
-
-const infoVideo = async (url,ext) => {
-    let getInfo = promisify(youtubedl.getInfo);
-    let result = await getInfo(url);
-
-    return {
-        titulo: result.title,
-        subidoPor: result.uploader,
-        calidad: result.format_note,
-        nombreArchivo: ext === 'mp4' ? result._filename : `${result._filename.slice(0,-1)}3` ,
+  if (response["Abrir descargas: "]) {
+    try {
+      await exec("start Downloads", { cwd: process.env.HOME })
+    } catch (error) {
+      console.error(error);
+      abortConversion()
     }
-}
+  }
 
-const opcionesDeVideo = async (optionSelected,URL)=>{
-    const PATH_DOWNLOAD = path.join( os.homedir(), 'Downloads')
+};
 
-    if(optionSelected === 'Audio'){ 
-        const informacionDelVideo = await infoVideo(URL,'mp3');
+const iniciarConversion = async () => {
+  log({COLOR: RED, TEXT: MAIN_TITLE});
 
-        downloadAudio( {URL, informacionDelVideo, PATH_DOWNLOAD} );
-    }else {
-        console.log('    ' + new inquirer.Separator() + new inquirer.Separator())
+  try {
+    const { URL } = await inquirer.prompt({
+      type: 'input',
+      message: chalk.hex(GRAY)('Ingrese una URL: '),
+      name: 'URL',
+      validate: (respuesta)=> {
+        if(!youtubedl.validateURL(respuesta.trim())){
+          return chalk.hex(RED)('Ingrese una URL Valida')
+        }
 
-        const informacionDelVideo = await infoVideo(URL,'mp4');
-        
-        let select = await inquirer.prompt({
-            type: 'rawlist',
-            name: 'quality',
-            message: chalk.hex('#dfe6e9').bgHex('#636e72')('¿que calidad de video quiere?'),
-            choices: ['La mejor','Normal']                    
-        })
-             
-        let calidad = select.quality;
-
-        downloadVideo( { URL, calidad , informacionDelVideo, PATH_DOWNLOAD } );
-    }
-
-    console.log('\nEspere...\n');
-
-    setTimeout(()=> console.log(chalk.hex('#f1c40f').bgBlack('Comenzando la descarga...')) , 300)
-}
-
-const downloadAudio =  ( {URL, informacionDelVideo , PATH_DOWNLOAD} ) =>{
-    youtubedl.exec(URL, ['-x', '--audio-format', 'mp3'], { cwd: PATH_DOWNLOAD }, (err, output ) => {
-        if (err) abortConversion();
-      
-        mensajePorDefecto(informacionDelVideo);
-        abrirAlTerminar();
-    })
-}
-
-const downloadVideo = ({URL, calidad, informacionDelVideo, PATH_DOWNLOAD}) => {
-    calidad === 'La mejor' ? downloadVideoBestQuality(URL,informacionDelVideo,PATH_DOWNLOAD) : 
-                             downloadNormalVideo(URL,informacionDelVideo,PATH_DOWNLOAD);
-}
-
-const downloadVideoBestQuality = (  URL, informacionDelVideo, PATH_DOWNLOAD  ) => {
-    youtubedl.exec( URL, ['-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]'], { cwd: PATH_DOWNLOAD  }, (err, output) => {
-        if (err) abortConversion();
-     
-        mensajePorDefecto(informacionDelVideo);
-        abrirAlTerminar();
-    })
-}
-
-const downloadNormalVideo = (URL, informacionDelVideo, PATH_DOWNLOAD )=>{
-    const video = youtubedl( URL , ['--format=18'] , { start: 0, cwd: PATH_DOWNLOAD })
-
-    video.pipe(fs.createWriteStream( informacionDelVideo.nombreArchivo) )
-         .on('error', _ => abortConversion() )
+        return true;
+      }
+    });
     
-    video.on('info', _ =>  mensajePorDefecto(informacionDelVideo) )
-         .on('error', _ => abortConversion() )
+    log({ COLOR: GRAY_DARK, TEXT: separator  });
 
-    process.once('beforeExit', _ => '\n' + abrirAlTerminar() );
-}
+    const { title, duration, description, ownerChannelName, videosLsData, audioLsData } = await getInfo(URL); 
+    showVideoInfo({ title, duration, description, ownerChannelName });
 
-const inicio = async ()=>{
-    let [ _ ,__ ,URL ] = process.argv;
+    log({ COLOR: GRAY_DARK, TEXT: separator  });
 
-    validacionDeURL(URL);
+    const { type } = await inquirer.prompt({
+      type: 'checkbox',
+      name: "type",
+      message: chalk.hex(GRAY)("¿Seleccione que desea dercargar?"),
+      choices: [{name: "Video"}, {name: "Audio"}],
+      validate: (types)=> {
+        if((!types.length || types.length >= 2)){
+          return chalk.hex(RED)('Debe seleccionar una opcion');
+        }
+        return true;
+      }
+    });
+  
+    let formatChooise = [];
+    if(type[0] === 'Video'){
+      formatChooise = videosLsData.map((video,idx)=> {
+        return { 
+          name: `${idx+1}. ${video.qualityLabel} (.${video.container}) | ${video.quality}`, 
+          itag: video.itag, 
+          ext: '.mp4'
+        }
+      })
+    } else {
+      formatChooise = audioLsData.map((audio, idx)=> {
+        return { name: `${idx+1}. ${Math.round(audio.bitrate / 1024)} kbps`, itag: audio.itag, ext: '.webm' }
+      })
+    }
 
-    console.log(
-        chalk.hex('#e17055')(
-            figlet.textSync('ConversorMA!', {
-                font: 'Standard',
-                horizontalLayout: 'default',
-                verticalLayout: 'default'
-            }
-        )
-    ))
+    log({ COLOR: GRAY_DARK, TEXT: separator  });
 
-    let options = await inquirer.prompt({
-        type: 'list',
-        name: 'select',
-        message: chalk.hex('#dfe6e9').bgHex('#636e72')('¿seleccione que desea dercargar?'),
-        choices: [ 'Video',  'Audio' ]
+    const { select } = await inquirer.prompt({
+      type: 'list',
+      name: "select",
+      message: chalk.hex(GRAY)("¿Seleccione una de las opciones?"),
+      choices: formatChooise,
     });
 
-    opcionesDeVideo(options.select,URL)
-}
+    const res = formatChooise.find(a=> a.name.includes(select));
 
-inicio();
+    const timestamp =  Date.now();
+    const name = title.toLowerCase().split(' ').join('_').slice(0,15).replace(/(\.|\||\\|\/|)/g, '');
 
-const abrirAlTerminar = async ()=>{
-    const response = await inquirer.prompt({
-        type:'confirm',
-        name:'openDownloadFolder',
-        message: '¿ quiere abrir la carpeta de descargas ?',
-    })
+    saveFile({ url: URL, ext: res.ext, itag: res.itag, title: `${timestamp}_${name}` })
+    // await abrirAlTerminar();
+    
+  } catch (error) {
+    console.log(error);
+    abortConversion()
+  }
+};
 
-    if(response.openDownloadFolder){
-        try {
-            await exec('start Downloads', { cwd: 'C:/Users/guido' });
-        }catch {
-            console.log(chalk.red('OH NO, lo sentimos, algo salio mal.'));
-        }
-    }
-
-    process.on('exit', _ => console.log(chalk.whiteBright.bgGreen('\nGracias por usar CoversorMA. Adios!') ) )
-}
+iniciarConversion();
