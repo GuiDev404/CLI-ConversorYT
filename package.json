@@ -7,6 +7,9 @@
     "start": "node descarga.js",
     "dev": "nodemon descarga.js"
   },
+  "bin": {
+    "convertidor": "./descarga.js"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -15,6 +18,16 @@
     "cli-progress": "3.9.0",
     "figlet": "1.3.0",
     "inquirer": "7.1.0",
-    "ytdl-core": "4.8.3"
+    "ytdl-core": "^4.9.1"
+  },
+  "pkg": {
+    "scripts": "descarga.js",
+    "assets": [
+      "node_modules/figlet/**/*",
+      "node_modules/cli-progress/**/*",
+      "node_modules/inquirer/**/*",
+      "node_modules/ytdl-core/**/*",
+      "node_modules/chalk/**/*"
+    ]
   }
 }

@@ -1,6 +1,7 @@
+#!/usr/bin/env NODE_OPTIONS=--no-warnings node
+
 const fs = require("fs");
-const { promisify } = require("util");
-const exec = promisify(require("child_process").exec);
+const exec = require("child_process").exec;
 const cliProgress = require('cli-progress');
 
 const inquirer = require("inquirer");
@@ -39,16 +40,13 @@ function saveFile ({ url, title, ext, itag }) {
   downloadProgress.start(100, 0);
 
   video.on('progress', (chunkLength, downloaded, total) => {
-    // const percent = downloaded / total;
     const progress = Number(((downloaded * 100) / total).toFixed(2));
     downloadProgress.update(progress, 0);
   })
 
   video.once('finish', async ()=> {
     downloadProgress.stop();
-    await abrirAlTerminar();
-
-    log({ COLOR: OK, TEXT: "\nGracias por usar CLI-Conversor. Adios!" })
+    abrirAlTerminar();
   })
 }
 
@@ -61,11 +59,19 @@ const abrirAlTerminar = async () => {
 
   if (response["Abrir descargas: "]) {
     try {
-      await exec("start Downloads", { cwd: process.env.HOME })
+
+      exec("start Downloads", { cwd: process.env.HOME }, (error, stdout, stderr)=> {
+        if (error) {
+          return;
+        }
+
+      })
     } catch (error) {
       console.error(error);
       abortConversion()
     }
+
+    log({ COLOR: OK, TEXT: "\nGracias por usar CLI-Conversor. Adios!" })
   }
 
 };
@@ -146,3 +152,5 @@ const iniciarConversion = async () => {
 };
 
 iniciarConversion();
+
+process.removeAllListeners('warning')
