@@ -59,16 +59,15 @@ const abrirAlTerminar = async () => {
 
   if (response["Abrir descargas: "]) {
     try {
-
-      exec("start Downloads", { cwd: process.env.HOME }, (error, stdout, stderr)=> {
+      exec(`start ${PATH_DOWNLOAD()}`, (error, stdout, stderr)=> {
         if (error) {
+          abortConversion('No se pudo abrir la carpeta de descargas');
           return;
         }
 
       })
     } catch (error) {
-      console.error(error);
-      abortConversion()
+      abortConversion('No se pudo abrir la carpeta de descargas');
     }
 
     log({ COLOR: OK, TEXT: "\nGracias por usar CLI-Conversor. Adios!" })
@@ -143,10 +142,8 @@ const iniciarConversion = async () => {
     const name = title.toLowerCase().split(' ').join('_').slice(0,15).replace(/(\.|\||\\|\/|)/g, '');
 
     saveFile({ url: URL, ext: res.ext, itag: res.itag, title: `${timestamp}_${name}` })
-    // await abrirAlTerminar();
     
   } catch (error) {
-    console.log(error);
     abortConversion()
   }
 };

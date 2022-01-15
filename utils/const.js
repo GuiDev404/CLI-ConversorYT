@@ -9,7 +9,7 @@ module.exports = {
   GRAY:  '#ecf0f1',
   GRAY_DARK: "#636e72",
   URLRegex: /^(http[s]?:\/\/)?(w{3}.)?youtu(be|\.be)?(\.com)?\/.+/gm,
-  PATH_DOWNLOAD: (filename)=> path.join(os.homedir(), "Downloads", filename),
+  PATH_DOWNLOAD: (filename = '')=> path.join(os.homedir(), "Downloads", filename),
   MAIN_TITLE: figlet.textSync("CLI Conversor", {
     font: "Swamp Land",
     horizontalLayout: "default",
