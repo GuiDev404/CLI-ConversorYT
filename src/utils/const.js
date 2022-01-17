@@ -8,11 +8,13 @@ module.exports = {
   WHITE: '#fff',
   GRAY:  '#ecf0f1',
   GRAY_DARK: "#636e72",
+  BLUE: "#2160ff",
   URLRegex: /^(http[s]?:\/\/)?(w{3}.)?youtu(be|\.be)?(\.com)?\/.+/gm,
   PATH_DOWNLOAD: (filename = '')=> path.join(os.homedir(), "Downloads", filename),
-  MAIN_TITLE: figlet.textSync("CLI Conversor", {
+  MAIN_TITLE: figlet.textSync("CLI Converter", {
     font: "Swamp Land",
     horizontalLayout: "default",
-    verticalLayout: "default",
+    verticalLayout: "default"
   }),
+  OPTIONS_DATE: { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
 }

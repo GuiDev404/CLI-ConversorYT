@@ -1,5 +1,5 @@
-const { GRAY_DARK, RED, URLRegex, WHITE } = require("./const");
-const chalk = require("chalk");
+const { GRAY_DARK, RED, URLRegex, WHITE } = require("./const.js");
+const chalk = require('chalk')
 
 const utils = {
   log: ({ COLOR, TEXT }) => console.log(chalk.hex(COLOR)(TEXT)),
@@ -36,7 +36,6 @@ const utils = {
     
       return hours+':'+minutes+':'+seconds;
   }
-       
 };
 
 module.exports = utils;

@@ -1,17 +1,21 @@
 #!/usr/bin/env NODE_OPTIONS=--no-warnings node
 
 const fs = require("fs");
-const exec = require("child_process").exec;
+const { exec } = require("child_process");
 const cliProgress = require('cli-progress');
 
 const inquirer = require("inquirer");
 const youtubedl = require("ytdl-core");
 const chalk = require("chalk");
+
 const separator =  new inquirer.Separator();
 const downloadProgress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
 const { log, showVideoInfo, abortConversion, filterData } = require('./utils');
-const { GRAY, GRAY_DARK, RED, PATH_DOWNLOAD, MAIN_TITLE, OK } = require('./utils/const');
+const { GRAY, GRAY_DARK, RED, PATH_DOWNLOAD, MAIN_TITLE, OK, BLUE, WHITE, OPTIONS_DATE } = require('./utils/const');
+const { createConnection, getConnection } = require('./utils/database')
+
+createConnection();
 
 async function getInfo(URL) {
   const info = await youtubedl.getInfo(URL);
@@ -30,7 +34,39 @@ async function getInfo(URL) {
   }
 }
 
-function saveFile ({ url, title, ext, itag }) {
+const getDownloads = ()=> getConnection().get('last_downloads').value();
+const addDownload = (download)=> getConnection().get("last_downloads").push(download).write();
+const deleteOld = ()=> getConnection().get("last_downloads").shift().write();
+
+function saveInLastDownload (download){
+  const lastDownloads = getDownloads();
+
+  if(lastDownloads.length >= 5){
+    deleteOld();
+  }
+
+  addDownload(download);
+}
+
+function printLastDownloads (){
+  const lastDownloadsLs = getConnection().get('last_downloads').value().reverse();
+  log({ COLOR: WHITE, TEXT: `Ultimas descargas: `});
+  
+  if(lastDownloadsLs.length){  
+    for (let i = 0; i < lastDownloadsLs.length; i++) {
+      const { videoTitle, url, date } = lastDownloadsLs[i];
+      const dateDownload = new Date(date).toLocaleDateString();
+
+      log({ COLOR: BLUE, TEXT: `${i+1}. ${videoTitle} - ${dateDownload}`});
+      log({ COLOR: GRAY_DARK, TEXT: `   ${url}` });
+    }
+    
+  } else {
+    log({ COLOR: GRAY_DARK, TEXT: 'No has descargado nada aun'  });
+  }
+}
+
+function saveFile ({ url, title, ext, itag, videoTitle }) {
   const outputFile = fs.createWriteStream(PATH_DOWNLOAD(`${title}${ext}`))
   
   const video = youtubedl(url, { filter: (format) => format.itag == itag });
@@ -46,6 +82,8 @@ function saveFile ({ url, title, ext, itag }) {
 
   video.once('finish', async ()=> {
     downloadProgress.stop();
+
+    saveInLastDownload({ url, videoTitle, date: new Date() })
     abrirAlTerminar();
   })
 }
@@ -70,15 +108,19 @@ const abrirAlTerminar = async () => {
       abortConversion('No se pudo abrir la carpeta de descargas');
     }
 
-    log({ COLOR: OK, TEXT: "\nGracias por usar CLI-Conversor. Adios!" })
+    log({ COLOR: OK, TEXT: "\nGracias por usar CLI-Converter. Adios!" })
   }
 
 };
 
 const iniciarConversion = async () => {
-  log({COLOR: RED, TEXT: MAIN_TITLE});
-
+  log({ COLOR: RED, TEXT: MAIN_TITLE });
+ 
   try {
+    printLastDownloads();
+
+    log({ COLOR: GRAY_DARK, TEXT: separator  });
+
     const { URL } = await inquirer.prompt({
       type: 'input',
       message: chalk.hex(GRAY)('Ingrese una URL: '),
@@ -137,11 +179,9 @@ const iniciarConversion = async () => {
     });
 
     const res = formatChooise.find(a=> a.name.includes(select));
+    const uid = `${Date.now()}_${Math.round(Math.random() * 1e6)}`;
 
-    const timestamp =  Date.now();
-    const name = title.toLowerCase().split(' ').join('_').slice(0,15).replace(/(\.|\||\\|\/|)/g, '');
-
-    saveFile({ url: URL, ext: res.ext, itag: res.itag, title: `${timestamp}_${name}` })
+    saveFile({ url: URL, ext: res.ext, itag: res.itag, title: uid, videoTitle: title })
     
   } catch (error) {
     abortConversion()
