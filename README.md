@@ -1,6 +1,6 @@
 ### Crear ejecutable: 
 
-1. Instalar pgk
+1. Instalar pkg
 ```bash
 npm install pkg -g
 ```
@@ -9,5 +9,5 @@ npm install pkg -g
 
 3. Ejecutar el siguiente comando (para este proyecto)
 ```bash
-pkg package.json -t host
+npm run build
 ```

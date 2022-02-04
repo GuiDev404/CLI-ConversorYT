@@ -15,6 +15,5 @@ module.exports = {
     font: "Swamp Land",
     horizontalLayout: "default",
     verticalLayout: "default"
-  }),
-  OPTIONS_DATE: { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }
+  })
 }

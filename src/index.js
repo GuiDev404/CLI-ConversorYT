@@ -11,8 +11,8 @@ const chalk = require("chalk");
 const separator =  new inquirer.Separator();
 const downloadProgress = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
-const { log, showVideoInfo, abortConversion, filterData } = require('./utils');
-const { GRAY, GRAY_DARK, RED, PATH_DOWNLOAD, MAIN_TITLE, OK, BLUE, WHITE, OPTIONS_DATE } = require('./utils/const');
+const { log, showVideoInfo, abortConversion, filterData, sortDescByDate } = require('./utils');
+const { GRAY, GRAY_DARK, RED, PATH_DOWNLOAD, MAIN_TITLE, OK, BLUE, WHITE } = require('./utils/const');
 const { createConnection, getConnection } = require('./utils/database')
 
 createConnection();
@@ -36,7 +36,7 @@ async function getInfo(URL) {
 
 const getDownloads = ()=> getConnection().get('last_downloads').value();
 const addDownload = (download)=> getConnection().get("last_downloads").push(download).write();
-const deleteOld = ()=> getConnection().get("last_downloads").shift().write();
+const deleteOld = ()=> getConnection().get("last_downloads").pop().write();
 
 function saveInLastDownload (download){
   const lastDownloads = getDownloads();
@@ -49,7 +49,7 @@ function saveInLastDownload (download){
 }
 
 function printLastDownloads (){
-  const lastDownloadsLs = getConnection().get('last_downloads').value().reverse();
+  const lastDownloadsLs = getConnection().get('last_downloads').value().sort(sortDescByDate)
   log({ COLOR: WHITE, TEXT: `Ultimas descargas: `});
   
   if(lastDownloadsLs.length){  
@@ -66,7 +66,7 @@ function printLastDownloads (){
   }
 }
 
-function saveFile ({ url, title, ext, itag, videoTitle }) {
+async function saveFile ({ url, title, ext, itag, videoTitle }) {
   const outputFile = fs.createWriteStream(PATH_DOWNLOAD(`${title}${ext}`))
   
   const video = youtubedl(url, { filter: (format) => format.itag == itag });
@@ -89,6 +89,7 @@ function saveFile ({ url, title, ext, itag, videoTitle }) {
 }
 
 const abrirAlTerminar = async () => {
+
   const response = await inquirer.prompt({
     type: "confirm",
     name: "Abrir descargas: ",
@@ -102,7 +103,6 @@ const abrirAlTerminar = async () => {
           abortConversion('No se pudo abrir la carpeta de descargas');
           return;
         }
-
       })
     } catch (error) {
       abortConversion('No se pudo abrir la carpeta de descargas');
@@ -110,7 +110,7 @@ const abrirAlTerminar = async () => {
 
     log({ COLOR: OK, TEXT: "\nGracias por usar CLI-Converter. Adios!" })
   }
-
+  
 };
 
 const iniciarConversion = async () => {

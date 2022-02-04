@@ -35,6 +35,12 @@ const utils = {
       if (seconds < 10) {seconds = "0"+seconds;}      
     
       return hours+':'+minutes+':'+seconds;
+  },
+  sortDescByDate: function (a, b){
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+
+    return dateB - dateA;
   }
 };
 
